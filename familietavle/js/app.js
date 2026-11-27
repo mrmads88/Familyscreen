@@ -51,6 +51,7 @@
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="8.5" cy="14.5" r=".9" fill="currentColor"/><circle cx="12" cy="14.5" r=".9" fill="currentColor"/>',
     cart: '<path d="M3 4h2.2l2.3 11h10.8l2-8H6.3"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>',
     search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+    qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 20h3M21 14v3"/>',
     truck: '<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
   };
   const ic = (n, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -601,6 +602,7 @@
         <button class="btn ghost" data-act="nm-search">${ic('search')}Find vare</button>
         <button class="btn ghost" data-act="nm-basket" ${items ? '' : 'disabled'}>Se kurven</button>
       </div>
+      ${nmOrderRow(items)}
       <p class="hint">Tavlen fylder kun kurven. Bestilling, betaling og leveringstid vælges i Nemlig-appen.</p>
     </section>`;
   }
@@ -747,9 +749,36 @@
       ${last ? `<div class="nm-sum one"><div class="tot"><small>Kurven i alt (uden levering)</small><b>${kr(last.basket_total)}</b></div></div>
         ${+last.missing_to_minimum > 0 ? `<p class="muted">Mangler ${kr(last.missing_to_minimum)} til minimumskøb.</p>` : ''}` : ''}
       ${skipped ? `<p class="muted">${skipped} ${skipped === 1 ? 'vare blev' : 'varer blev'} sprunget over og står stadig på listen.</p>` : ''}
-      <p class="muted">Husk at bestille og vælge levering i Nemlig-appen.</p>
-      <div class="form-actions"><button class="btn primary" data-close-modal>OK</button></div>`, 'small')
+      ${added.length ? nmOrderRow(1) : ''}
+      <div class="form-actions"><button class="btn ghost" data-close-modal>Luk</button></div>`, 'small')
       .addEventListener('click', e => { if (e.target.closest('[data-close-modal]')) closeModal(e.currentTarget); });
+  }
+
+  /* ----- bestil: åbn kurven i Nemlig-appen (app-link) eller scan en QR-kode med mobilen ----- */
+  const NM_BASKET_URL = 'https://www.nemlig.com/kurv';
+  const nmOrderRow = items => `<div class="nm-order">
+      <a class="btn nm-go ${items ? '' : 'off'}" href="${NM_BASKET_URL}" target="_blank" rel="noopener noreferrer">${ic('truck')}Bestil i Nemlig</a>
+      <button class="btn ghost nm-qr-btn" data-act="nm-qr" aria-label="Vis QR-kode til mobilen" title="Bestil fra mobilen">${ic('qr')}</button>
+    </div>`;
+  let qrLib;
+  const loadQr = () => qrLib || (qrLib = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = () => res(window.QRCode); s.onerror = () => { qrLib = null; rej(new Error('QR-koden kunne ikke hentes')); };
+    document.head.appendChild(s);
+  }));
+  async function nemligQr() {
+    const m = modal(`<h2>Bestil fra mobilen</h2>
+      <p class="muted">Scan koden med kameraet. Så åbner kurven i Nemlig-appen, hvor I vælger levering og betaler.</p>
+      <div class="nm-qr"><div class="empty">Laver QR-kode …</div></div>
+      <div class="form-actions"><button class="btn primary" data-close-modal>Luk</button></div>`, 'small');
+    m.addEventListener('click', e => { if (e.target.closest('[data-close-modal]')) closeModal(m); });
+    const box = $('.nm-qr', m);
+    try {
+      const QR = await loadQr();
+      box.innerHTML = '';
+      new QR(box, { text: NM_BASKET_URL, width: 240, height: 240, colorDark: '#0b1020', colorLight: '#ffffff', correctLevel: QR.CorrectLevel.M });
+    } catch (e) { box.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}<br>Åbn i stedet <b>nemlig.com/kurv</b> på mobilen.</div>`; }
   }
 
   /* ----- tavlens hukommelse: hvad I plejer at købe, og hvilket ord der hører til hvilken vare ----- */
@@ -1963,6 +1992,7 @@
     'nm-fill': () => nemligFill(),
     'nm-search': () => nemligSearch(),
     'nm-basket': () => nemligBasket(),
+    'nm-qr': () => nemligQr(),
     'shop-clear': async () => { if (await call('todo', 'remove_completed_items', { entity_id: shopEntity() })) loadShop(); },
     'new-event': () => newEventModal(),
     'save-event': async el => {

@@ -453,6 +453,14 @@ input[type=range]::-moz-range-thumb { width: 1.5rem; height: 1.5rem; border: 0; 
 .nm-actions .btn.primary { flex: 1 1 100%; }
 .nm-actions .btn.ghost { flex: 1; }
 .nm-actions .btn[disabled] { opacity: .45; }
+.nm-order { display: flex; gap: .5rem; margin-top: .5rem; }
+.nm-go { flex: 1; background: linear-gradient(135deg, #1fae5b, #34d27b); color: #04210f; text-decoration: none; box-shadow: 0 10px 26px -12px #34d27b; }
+.nm-go.off { opacity: .5; }
+.nm-go .ic { width: 1.3rem; height: 1.3rem; }
+.nm-qr-btn { flex: none; min-width: 3.2rem; padding-inline: .8rem; }
+.nm-qr { display: grid; place-items: center; width: max-content; max-width: 100%; margin: 1rem auto; padding: .9rem; border-radius: 1rem; background: #fff; color: #0b1020; }
+.nm-qr .empty { color: #4a5270; }
+.nm-qr img, .nm-qr canvas { display: block; max-width: 100%; height: auto; }
 .nm-line { color: var(--text); }
 .nm-line .ic { color: var(--accent-2); }
 .nm-line.out_for_delivery .ic { color: var(--good); }
