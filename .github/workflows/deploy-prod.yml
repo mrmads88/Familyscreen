@@ -1,0 +1,64 @@
+name: Deploy Familyscreen Prod to Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Skriv PRODUCTION for at udrulle den valgte Production-commit'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: familyscreen-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/Production' && inputs.confirmation == 'PRODUCTION'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Syntakstjek
+        run: for f in familietavle/js/*.js; do node --check "$f"; done
+
+      - name: Tjek for personlige data
+        run: |
+          # stopper udrulningen hvis der ved en fejl er kommet backup-filer eller tokens med
+          if find familietavle -name '*opsaetning*.json' -o -name '*backup*.json' | grep -q .; then
+            echo "Backup-fil fundet i familietavle/ – fjern den"; exit 1
+          fi
+          if grep -rIl 'eyJ[A-Za-z0-9_-]\{20,\}\.' familietavle; then
+            echo "Noget der ligner et token er fundet – fjern det"; exit 1
+          fi
+
+      - name: Pak tavlen
+        run: |
+          mkdir -p deploy
+          cp -a familietavle/. deploy/
+          rm -f deploy/LÆS-MIG.md
+          echo "${GITHUB_SHA::7}" > deploy/VERSION
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: deploy
+          skip_app_build: true
+
+      - name: Tjek at tavlen svarer
+        run: |
+          sha="${GITHUB_SHA::7}"
+          for i in $(seq 1 30); do
+            v=$(curl -fsS "https://delightful-bay-0e20d3a0f.3.azurestaticapps.net/VERSION" 2>/dev/null || true)
+            [ "$v" = "$sha" ] && { echo "Tavlen kører version $v"; exit 0; }
+            sleep 10
+          done
+          echo "Tavlen svarede ikke med den nye version"; exit 1

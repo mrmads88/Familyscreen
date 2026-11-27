@@ -1,0 +1,10 @@
+# Personlige data må aldrig i repoet
+familietavle-opsaetning*.json
+*backup*.json
+*.zip
+.env
+.claude/settings.local.json
+
+# Diverse
+.DS_Store
+Thumbs.db
