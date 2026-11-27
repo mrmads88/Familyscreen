@@ -1525,6 +1525,8 @@
         <label class="field"><span>Adresse</span><input id="ha-url" value="${esc(c.ha.url || suggested)}" placeholder="http://homeassistant.local:8123" autocomplete="off" spellcheck="false"></label>
         <label class="field"><span>Long-lived access token</span><input id="ha-token" type="password" value="${esc(c.ha.token)}" placeholder="Indsæt token fra din profil i HA" autocomplete="off"></label>
       </div>
+      ${location.protocol === 'https:' && /^http:\/\/(localhost|127\.0\.0\.1)/i.test(c.ha.url || '')
+        ? `<p class="hint">⚠️ Tavlen kører fra internettet, men adressen peger på <b>localhost</b>, som kun virker på den pc, der kører Home Assistant. Brug jeres Tailscale-adresse, fx <b>https://homeassistant.xxxx.ts.net</b>.</p>` : ''}
       <div class="row">
         <button class="btn primary" data-act="ha-connect">Gem & forbind</button>
         <button class="btn ghost" data-act="ha-demo">Brug demo-data</button>
