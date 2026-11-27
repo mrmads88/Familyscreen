@@ -79,17 +79,20 @@
 
   /* ================= Home Assistant ================= */
   let lastStatus = null;
+  // Tailscale-adresser (*.ts.net) svarer kun på https – og en https-side må ikke bruge http
+  const fixHaUrl = u => (/^http:\/\/[^/]+\.ts\.net/i.test(u || '') ? u.replace(/^http:/i, 'https:') : u);
   function connectHA() {
     App.ha?.close();
-    const { url, token } = cfg().ha;
+    const { token } = cfg().ha, url = fixHaUrl(cfg().ha.url);
     App.ha = url && token ? new HAClient(url, token) : new DemoHA();
     lastStatus = null;
     App.ha.on(onHA);
     App.ha.connect();
   }
   function onHA(ha) {
-    if (ha.status !== lastStatus) {
-      lastStatus = ha.status;
+    const stKey = ha.status + '|' + (ha.phase || '');
+    if (stKey !== lastStatus) {
+      lastStatus = stKey;
       renderTopbar();
       if (App.page === 'parent' && App.parentTab === 'integrations' && !isEditing()) render();
     }
@@ -1513,8 +1516,8 @@
   function pIntegrations() {
     const c = cfg(), ha = App.ha;
     const stTxt = {
-      demo: 'Kører med demo-data', connected: `Forbundet ✓ · ${Object.keys(ha.states).length} enheder`, connecting: 'Forbinder…',
-      disconnected: 'Afbrudt – prøver igen…', auth_invalid: 'Forkert token', error: ha.error || 'Fejl',
+      demo: 'Kører med demo-data', connected: `Forbundet ✓ · ${Object.keys(ha.states).length} enheder`, connecting: `Forbinder… (${ha.phase || 'starter'})`,
+      disconnected: `Afbrudt – prøver igen…${ha.error ? ' · ' + ha.error : ''}`, auth_invalid: 'Forkert token', error: ha.error || 'Fejl',
     }[ha.status] || ha.status;
     const suggested = !c.ha.url && location.pathname.startsWith('/local/') ? location.origin : '';
     return `
@@ -1526,7 +1529,9 @@
         <label class="field"><span>Long-lived access token</span><input id="ha-token" type="password" value="${esc(c.ha.token)}" placeholder="Indsæt token fra din profil i HA" autocomplete="off"></label>
       </div>
       ${location.protocol === 'https:' && /^http:\/\/(localhost|127\.0\.0\.1)/i.test(c.ha.url || '')
-        ? `<p class="hint">⚠️ Tavlen kører fra internettet, men adressen peger på <b>localhost</b>, som kun virker på den pc, der kører Home Assistant. Brug jeres Tailscale-adresse, fx <b>https://homeassistant.xxxx.ts.net</b>.</p>` : ''}
+        ? `<p class="hint">⚠️ Tavlen kører fra internettet, men adressen peger på <b>localhost</b>, som kun virker på den pc, der kører Home Assistant. Brug jeres Tailscale-adresse, fx <b>https://homeassistant.xxxx.ts.net</b>.</p>`
+        : location.protocol === 'https:' && /^http:\/\//i.test(c.ha.url || '')
+          ? `<p class="hint">⚠️ Adressen starter med <b>http://</b>. Når tavlen kører fra internettet (https), skal Home Assistant også nås via <b>https://</b>, ellers blokerer browseren forbindelsen.</p>` : ''}
       <div class="row">
         <button class="btn primary" data-act="ha-connect">Gem & forbind</button>
         <button class="btn ghost" data-act="ha-demo">Brug demo-data</button>
@@ -2103,7 +2108,8 @@
       let url = $('#ha-url').value.trim();
       const token = $('#ha-token').value.trim();
       if (!url || !token) return toast('Udfyld både adresse og token', 'bad');
-      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      if (!/^https?:\/\//i.test(url)) url = (location.protocol === 'https:' || /\.ts\.net/i.test(url) ? 'https://' : 'http://') + url;
+      url = fixHaUrl(url);
       Store.setPath('settings.ha', { url, token });
       connectHA();
       render();

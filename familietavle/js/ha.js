@@ -30,11 +30,13 @@ class HAClient extends HABase {
 
   connect() {
     this.status = 'connecting';
+    this.phase = 'åbner forbindelse';
     this.emit();
     let ws;
     try { ws = new WebSocket(this.url.replace(/^http/i, 'ws') + '/api/websocket'); }
     catch (e) { this.status = 'error'; this.error = 'Ugyldig adresse'; this.emit(); return; }
     this.ws = ws;
+    ws.onopen = () => { this.phase = 'venter på Home Assistant'; this.emit(); };
     ws.onmessage = ev => this.onMsg(JSON.parse(ev.data));
     ws.onerror = () => { this.error = 'Kan ikke nå Home Assistant på ' + this.url; };
     ws.onclose = () => {
@@ -53,6 +55,8 @@ class HAClient extends HABase {
 
   async onMsg(m) {
     if (m.type === 'auth_required') {
+      this.phase = 'logger ind';
+      this.emit();
       this.ws.send(JSON.stringify({ type: 'auth', access_token: this.token }));
     } else if (m.type === 'auth_invalid') {
       this.status = 'auth_invalid';
@@ -61,6 +65,8 @@ class HAClient extends HABase {
       this.ws.close();
     } else if (m.type === 'auth_ok') {
       this.retry = 0;
+      this.phase = 'henter enheder';
+      this.emit();
       try {
         const states = await this.send({ type: 'get_states' });
         this.states = {};
@@ -73,7 +79,11 @@ class HAClient extends HABase {
         this.heartbeat = setInterval(() => {
           this.send({ type: 'ping' }).catch(() => { try { this.ws.close(); } catch (e) { /* ok */ } });
         }, 30000);
-      } catch (e) { this.error = e.message; }
+      } catch (e) {
+        // logget ind, men kunne ikke hente enheder – vis fejlen i stedet for at hænge på "Forbinder"
+        this.status = 'error';
+        this.error = 'Logget ind, men kunne ikke hente enheder: ' + e.message;
+      }
       this.emit();
     } else if (m.type === 'result') {
       const p = this.pending.get(m.id);
