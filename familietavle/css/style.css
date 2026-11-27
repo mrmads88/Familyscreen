@@ -371,6 +371,10 @@ input[type=range]::-moz-range-thumb { width: 1.5rem; height: 1.5rem; border: 0; 
 .ev-time { min-width: 4.4rem; font-weight: 900; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; font-size: .95rem; }
 .ev-time small { color: var(--muted); font-weight: 700; font-size: .78rem; }
 .ev-body { display: flex; flex-direction: column; min-width: 0; }
+.ev.tinted { background: color-mix(in srgb, var(--ec) 22%, rgba(255,255,255,.03)); }
+.ev-kid { width: 2.3rem; height: 2.3rem; flex: none; align-self: center; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: color-mix(in srgb, var(--ec) 35%, transparent); box-shadow: 0 0 0 2px var(--ec); }
+.ev-kid .av-img { width: 100%; height: 100%; object-fit: cover; }
+.ev-kid .av-emoji { font-size: 1.3rem; line-height: 1; }
 .ev-body b { font-size: 1.05rem; }
 .ev-body small { color: var(--muted); font-size: .8rem; }
 .shop-add { display: flex; gap: .6rem; margin-bottom: .9rem; }

@@ -357,6 +357,31 @@
     return set.length ? set : Object.keys(App.ha.states).filter(id => id.startsWith('calendar.') && ok(id)).sort();
   }
   const calColor = id => CAL_COLORS[Math.max(0, calEntities().indexOf(id)) % CAL_COLORS.length];
+
+  // Farver efter navn i aftalens titel, fx "Emma svømning" → grøn.
+  // Home Assistant sender ikke Google-farven med, så tavlen genkender navnene i stedet.
+  const GCOLORS = {
+    rød: '#d50000', tomat: '#d50000', lyserød: '#e67c73', flamingo: '#e67c73', orange: '#f4511e', mandarin: '#f4511e',
+    gul: '#f6bf26', banan: '#f6bf26', grøn: '#0b8043', basilikum: '#0b8043', lysegrøn: '#33b679', salvie: '#33b679',
+    blå: '#039be5', påfugl: '#039be5', mørkeblå: '#3f51b5', blåbær: '#3f51b5', lavendel: '#7986cb',
+    lilla: '#8e24aa', drue: '#8e24aa', grå: '#616161', grafit: '#616161',
+  };
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function calRules() {
+    const rules = String(cfg().calColors || '').split('\n').map(l => l.split('=').map(x => x.trim())).filter(([w, c]) => w && c)
+      .map(([word, c]) => ({ word, color: GCOLORS[c.toLowerCase()] || (/^#[0-9a-f]{3,8}$/i.test(c) ? c : null) }))
+      .filter(r => r.color);
+    // børn uden egen linje får deres farve fra tavlen
+    S().kids.forEach(k => { if (k.name && !rules.some(r => r.word.toLowerCase() === k.name.toLowerCase())) rules.push({ word: k.name, color: k.color }); });
+    return rules.map(r => ({ ...r, kid: S().kids.find(k => k.name && k.name.toLowerCase() === r.word.toLowerCase()),
+      re: new RegExp(`(^|[^\\p{L}])${reEsc(r.word)}s?(?![\\p{L}])`, 'iu') }));
+  }
+  function evMatch(ev) {
+    const rules = calRules(), title = ev.summary || '', desc = ev.description || '';
+    let best = null;
+    rules.forEach(r => { const m = r.re.exec(title); if (m && (!best || m.index < best.i)) best = { ...r, i: m.index }; });
+    return best || rules.find(r => r.re.test(desc)) || null;
+  }
   function shopEntity() {
     if (cfg().shopping && App.ha.states[cfg().shopping]) return cfg().shopping;
     const todos = Object.keys(App.ha.states).filter(id => id.startsWith('todo.'));
@@ -424,8 +449,10 @@
     const allDay = /^\d{4}-\d{2}-\d{2}$/.test(ev.start);
     const st = parseWhen(ev.start), en = parseWhen(ev.end || ev.start);
     const calName = App.ha.get(ev.cal)?.attributes?.friendly_name || '';
-    return `<div class="ev" style="--ec:${calColor(ev.cal)}">
+    const who = evMatch(ev);
+    return `<div class="ev ${who ? 'tinted' : ''}" style="--ec:${who ? who.color : calColor(ev.cal)}">
       <span class="ev-time">${allDay ? 'Hele dagen' : `${hm(st)}<small>${hm(en)}</small>`}</span>
+      ${who?.kid ? `<span class="ev-kid">${avatar(who.kid)}</span>` : ''}
       <span class="ev-body"><b>${esc(ev.summary || '(uden titel)')}</b>
         <small>${[ev.location, calEntities().length > 1 ? calName : ''].filter(Boolean).map(esc).join(' · ')}</small></span>
     </div>`;
@@ -1557,6 +1584,8 @@
         ${bindField('Indkøbsliste', 'settings.shopping', c.shopping, 'todo', 'todo.indkobsliste')}
         ${bindField('Nemlig-kurv (tom = find selv)', 'settings.nemlig', c.nemlig, 'sensor', 'sensor.nemlig_kurv')}
       </div>
+      <label class="field"><span>Farver i kalenderen: én pr. linje, fx <b>Emma = grøn</b>. Navnet skal stå i aftalens titel. Farver: blå, grøn, gul, lilla, rød, orange, lyserød, mørkeblå, lysegrøn, lavendel, grå eller #hex. Børn uden linje får deres farve fra tavlen.</span>
+        <textarea data-bind="settings.calColors" rows="4" spellcheck="false" placeholder="Emma = grøn&#10;Mor = lilla">${esc(c.calColors || '')}</textarea></label>
       <label class="field"><span>Hurtig-knapper til indkøbslisten (adskil med komma)</span>
         <input data-bind="settings.quickItems" value="${esc(c.quickItems || '')}" autocomplete="off"></label>
     </div>

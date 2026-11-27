@@ -86,6 +86,7 @@ const Store = (() => {
         calendarDefault: '',
         shopping: '',
         nemlig: '',
+        calColors: '',
         quickItems: 'Mælk, Rugbrød, Franskbrød, Æg, Smør, Ost, Pålæg, Frugt, Grønt, Kaffe, Yoghurt, Toiletpapir',
         streaming: STREAMING.map(x => ({ ...x })),
       },
