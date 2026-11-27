@@ -112,11 +112,7 @@ Slå *Lette effekter* til under *Forældre → Skærm*, hvis animationerne hakke
 
 Tavlen bestiller aldrig: bestilling, betaling og leveringstid vælges i Nemlig-appen. Kurven er den samme som i appen.
 
-**Varebilleder (valgfrit):** integrationen sender ikke billeder med som standard. Installér tilføjelsen *File editor*, åbn `custom_components/nemlig/services.py`, find funktionen `_product` og indsæt under linjen `"name": raw.get("Name"),` en ny linje med samme indrykning:
-```python
-"image_url": raw.get("PrimaryImage"),
-```
-Gem og genstart Home Assistant. Linjen skal sættes ind igen, hvis integrationen opdateres.
+**Varebilleder og ret/fjern i kurven (valgfrit):** integrationen kan som standard hverken sende billeder eller rette antal i kurven. To små tilføjelser i integrationen klarer det. Se den præcise kode i `ha-tilfoejelser/nemlig.md` i repoet. De skal sættes ind igen, hvis integrationen opdateres. Uden dem virker tavlen stadig, bare uden billeder og uden −/+/fjern i "Se kurven".
 
 ## 5. Sådan virker tavlen
 

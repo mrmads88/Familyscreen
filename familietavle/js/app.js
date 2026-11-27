@@ -870,21 +870,53 @@
     setTimeout(() => $('#nm-q')?.focus(), 50);
   }
 
+  // Kurven med − / + / fjern. Kræver handlingen nemlig.set_quantity (Familietavle-tilføjelse i integrationen, se LÆS-MIG).
   function nemligBasket() {
-    const n = nemligIds(), b = n && App.ha.get(n.basket);
-    if (!b) return;
-    const a = b.attributes, lines = a.lines || [];
-    const m = modal(`<h2>Nemlig-kurven</h2>
-      <div class="nm-lines">${lines.map(l => `<div class="nm-line-row"><span class="q">${l.quantity} ×</span>${nmImgTag(l.image_url || NM().known[String(l.product_id)]?.img, 'nm-img sm')}<span class="nm-n">${esc(l.name)}</span><b>${kr(l.price)}</b></div>`).join('')
-        || '<div class="empty">Kurven er tom.</div>'}</div>
-      <div class="nm-sum">
-        <div><small>Varer</small><b>${kr(b.state)}</b></div>
-        <div><small>Levering</small><b>${a.delivery_price == null ? '–' : +a.delivery_price ? kr(a.delivery_price) : 'Gratis'}</b></div>
-        <div class="tot"><small>I alt</small><b>${kr(a.total_price ?? b.state)}</b></div>
-      </div>
-      <p class="muted">Vil I rette eller fjerne en vare, så gør det i Nemlig-appen. Den viser den samme kurv.</p>
-      <div class="form-actions"><button class="btn primary" data-close-modal>Luk</button></div>`);
-    m.addEventListener('click', e => { if (e.target.closest('[data-close-modal]')) closeModal(m); });
+    const n = nemligIds();
+    if (!n || !App.ha.get(n.basket)) return;
+    const m = modal(`<h2>Nemlig-kurven</h2><div class="nm-basket-body"></div>
+      <div class="form-actions">${nmOrderRow(1).replace('class="nm-order"', 'class="nm-order grow"')}<button class="btn ghost" data-close-modal>Luk</button></div>`);
+    App.noSaver = true;
+    const body = $('.nm-basket-body', m);
+    const paint = () => {
+      const b = App.ha.get(n.basket), a = b?.attributes || {}, lines = a.lines || [];
+      body.innerHTML = `<div class="nm-lines">${lines.map(l => `<div class="nm-line-row" data-pid="${esc(l.product_id)}">
+          ${nmImgTag(l.image_url || NM().known[String(l.product_id)]?.img, 'nm-img sm')}
+          <span class="nm-n">${esc(l.name)}<small>${kr(l.price)}</small></span>
+          <span class="nm-qty">
+            <button class="nm-q" data-q="${l.quantity - 1}" aria-label="Én mindre">${l.quantity > 1 ? '−' : ic('trash')}</button>
+            <b>${l.quantity}</b>
+            <button class="nm-q" data-q="${l.quantity + 1}" aria-label="Én mere" ${l.quantity >= 50 ? 'disabled' : ''}>+</button>
+          </span>
+          <button class="nm-q del" data-q="0" aria-label="Fjern varen">${ic('x')}</button>
+        </div>`).join('') || '<div class="empty">Kurven er tom.</div>'}</div>
+        <div class="nm-sum">
+          <div><small>Varer</small><b>${kr(b?.state)}</b></div>
+          <div><small>Levering</small><b>${a.delivery_price == null ? '–' : +a.delivery_price ? kr(a.delivery_price) : 'Gratis'}</b></div>
+          <div class="tot"><small>I alt</small><b>${kr(a.total_price ?? b?.state)}</b></div>
+        </div>
+        ${+a.missing_to_minimum > 0 ? `<p class="muted">Mangler ${kr(a.missing_to_minimum)} til minimumskøb.</p>` : ''}`;
+    };
+    paint();
+    m.addEventListener('click', async e => {
+      if (e.target === m || e.target.closest('[data-close-modal]')) { App.noSaver = false; if (e.target !== m) closeModal(m); return; }
+      const btn = e.target.closest('.nm-q');
+      if (!btn) return;
+      const row = btn.closest('[data-pid]'), q = Math.max(0, +btn.dataset.q);
+      row.classList.add('busy');
+      $$('.nm-q', m).forEach(x => { x.disabled = true; });
+      const before = App.ha.get(n.basket)?.last_updated;
+      try {
+        await App.ha.callServiceResponse('nemlig', 'set_quantity', { product_id: row.dataset.pid, quantity: q });
+        FX.sound(q ? 'tap' : 'undo');
+        // vent (højst 2 sek.) til Home Assistant har opdateret kurven
+        for (let i = 0; i < 20 && App.ha.get(n.basket)?.last_updated === before; i++) await new Promise(r => setTimeout(r, 100));
+      } catch (err) {
+        const missing = /set_quantity|not found|ikke fundet|unknown/i.test(err.message || '');
+        toast(missing ? '⚠️ Kurven kan ikke rettes endnu: tilføjelsen i Nemlig-integrationen mangler (se LÆS-MIG).' : '⚠️ ' + (err.message || 'Noget gik galt'), 'bad');
+      }
+      paint();
+    });
   }
 
   function newEventModal() {

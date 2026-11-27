@@ -246,6 +246,14 @@ class DemoHA extends HABase {
     const words = q => low(q).split(/\s+/).filter(Boolean);
     const match = (p, q) => words(q).every(w => low(`${p.brand} ${p.name} ${p.description}`).includes(w));
     if (service === 'search') return { products: this.nmCat.filter(p => match(p, data.query)).slice(0, data.limit || 10).map(card) };
+    if (service === 'set_quantity') {
+      const q = Math.max(0, +data.quantity || 0);
+      this.nmBasket = q ? this.nmBasket.map(l => (l.product_id === String(data.product_id) ? { ...l, quantity: q } : l))
+        : this.nmBasket.filter(l => l.product_id !== String(data.product_id));
+      const sum = this.nmUpdate();
+      this.emit();
+      return { status: q ? 'updated' : 'removed', product_id: String(data.product_id), quantity: q, ...sum };
+    }
     if (service !== 'add_product') return {};
     let p = data.product_id && this.nmCat.find(x => x.product_id === String(data.product_id));
     if (!p) {
